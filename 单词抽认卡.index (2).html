@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自定义单词抽认卡 (支持批量导入)</title>
+    <style>
+        :root {
+            --primary-color: #4F46E5; /* 靛蓝色主色调 */
+            --primary-hover: #4338CA;
+            --bg-color: #F3F4F6;      /* 浅灰背景 */
+            --card-bg: #FFFFFF;
+            --text-main: #1F2937;
+            --text-muted: #4B5563;
+            --danger-color: #EF4444;
+            --danger-hover: #DC2626;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        /* ---------------- 表单区域样式 ---------------- */
+        .input-section {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            margin-bottom: 32px;
+        }
+
+        .input-section h2 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+        
+        .input-section p.hint {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            margin-top: 0;
+            line-height: 1.5;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-main);
+        }
+
+        .input-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #D1D5DB;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+            transition: all 0.2s ease;
+            background-color: #F9FAFB;
+        }
+
+        .input-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background-color: #FFFFFF;
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15);
+        }
+
+        button.submit-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.05rem;
+            font-weight: 600;
+            width: 100%;
+            transition: background-color 0.2s, transform 0.1s;
+            margin-top: 8px;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3);
+        }
+
+        button.submit-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button.submit-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* ---------------- 抽认卡网格与动画样式 ---------------- */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+            padding-bottom: 40px;
+        }
+
+        .flashcard {
+            background-color: transparent;
+            height: 240px;
+            perspective: 1000px; /* 3D 效果关键属性 */
+            cursor: pointer;
+            position: relative;
+        }
+
+        .flashcard-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+            border-radius: 16px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+        }
+
+        .flashcard.is-flipped .flashcard-inner {
+            transform: rotateY(180deg);
+        }
+
+        .flashcard-front, .flashcard-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            box-sizing: border-box;
+            border-radius: 16px;
+            border: 1px solid #E5E7EB;
+        }
+
+        .flashcard-front {
+            background-color: var(--card-bg);
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            word-break: break-word;
+        }
+
+        .flashcard-back {
+            background-color: #EEF2FF;
+            border-color: #C7D2FE;
+            transform: rotateY(180deg);
+        }
+
+        .flashcard-back .meaning {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 16px;
+            word-break: break-word;
+        }
+
+        .flashcard-back .example {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-style: italic;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        /* ---------------- 删除按钮样式 ---------------- */
+        .delete-btn {
+            position: absolute;
+            top: -12px;
+            right: -12px;
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s, background-color 0.2s;
+        }
+
+        /* 触摸设备默认显示，鼠标设备悬停显示 */
+        @media (hover: hover) {
+            .flashcard:hover .delete-btn {
+                opacity: 1;
+            }
+        }
+        @media (hover: none) {
+            .delete-btn {
+                opacity: 0.8;
+            }
+        }
+
+        .delete-btn:hover {
+            background: var(--danger-hover);
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 录入区域 -->
+        <div class="input-section">
+            <h2>制作新卡片</h2>
+            <p class="hint">支持批量生成。多项内容请使用<strong>中文分号（；）</strong>隔开，系统将按顺序一一对应生成卡片。</p>
+            <form id="cardForm">
+                <div class="input-group">
+                    <label for="word">单词 (Word)</label>
+                    <textarea id="word" rows="2" required placeholder="例如：Fascinating；Incredible；Resilient"></textarea>
+                </div>
+                <div class="input-group">
+                    <label for="meaning">释义 (Meaning)</label>
+                    <textarea id="meaning" rows="2" required placeholder="例如：迷人的；不可思议的；有韧性的"></textarea>
+                </div>
+                <div class="input-group">
+                    <label for="example">例句 (Example Sentence)</label>
+                    <textarea id="example" rows="3" placeholder="例如：It is a fascinating book.；The view was incredible.；She is highly resilient."></textarea>
+                </div>
+                <button type="submit" class="submit-btn">批量生成抽认卡</button>
+            </form>
+        </div>
+        
+        <!-- 卡片展示区域 -->
+        <div class="cards-grid" id="cardsGrid">
+            <!-- 动态生成的卡片将插入到这里 -->
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('cardForm').addEventListener('submit', function(e) {
+            e.preventDefault(); // 阻止表单默认提交行为
+            
+            // 获取并获取用户输入的值
+            const wordsInput = document.getElementById('word').value;
+            const meaningsInput = document.getElementById('meaning').value;
+            const examplesInput = document.getElementById('example').value;
+            
+            // 以中文分号 "；" 作为分隔符切分数组，并清除前后的多余空格
+            const wordsArray = wordsInput.split('；').map(item => item.trim());
+            const meaningsArray = meaningsInput.split('；').map(item => item.trim());
+            const examplesArray = examplesInput.split('；').map(item => item.trim());
+            
+            // 找出最长的数组长度，兼容用户某一项少输入分号的情况
+            const maxLength = Math.max(wordsArray.length, meaningsArray.length, examplesArray.length);
+            
+            // 批量生成卡片 (反向循环让最先输入的词汇排在网格的最前面)
+            for (let i = maxLength - 1; i >= 0; i--) {
+                const w = wordsArray[i] || '';
+                const m = meaningsArray[i] || '';
+                const ex = examplesArray[i] || '';
+                
+                // 确保单词或释义至少存在一个才生成，避免由于连续分号产生空白卡片
+                if (w !== '' || m !== '') {
+                    createFlashcard(w, m, ex);
+                }
+            }
+            
+            // 清空表单以便下次输入
+            this.reset();
+            document.getElementById('word').focus();
+        });
+
+        // 动态创建抽认卡 DOM 元素
+        function createFlashcard(word, meaning, example) {
+            const grid = document.getElementById('cardsGrid');
+            
+            // 1. 卡片外层容器 (提供 3D 视角)
+            const card = document.createElement('div');
+            card.className = 'flashcard';
+            
+            // 2. 删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '×';
+            deleteBtn.title = '删除此卡片';
+            deleteBtn.onclick = function(e) {
+                e.stopPropagation(); // 阻止点击事件冒泡，防止触发卡片翻转
+                
+                // 添加缩放消失动画后再移除 DOM
+                card.style.transition = 'transform 0.3s, opacity 0.3s';
+                card.style.transform = 'scale(0.8)';
+                card.style.opacity = '0';
+                setTimeout(() => card.remove(), 300);
+            };
+
+            // 3. 翻转内容容器
+            const cardInner = document.createElement('div');
+            cardInner.className = 'flashcard-inner';
+            
+            // 4. 正面（显示单词）
+            const cardFront = document.createElement('div');
+            cardFront.className = 'flashcard-front';
+            cardFront.textContent = word;
+            
+            // 5. 背面（显示释义和例句）
+            const cardBack = document.createElement('div');
+            cardBack.className = 'flashcard-back';
+            
+            const meaningEl = document.createElement('div');
+            meaningEl.className = 'meaning';
+            meaningEl.textContent = meaning;
+            cardBack.appendChild(meaningEl);
+            
+            if (example) {
+                const exampleEl = document.createElement('div');
+                exampleEl.className = 'example';
+                exampleEl.textContent = example;
+                cardBack.appendChild(exampleEl);
+            }
+            
+            // 组装结构
+            cardInner.appendChild(cardFront);
+            cardInner.appendChild(cardBack);
+            card.appendChild(deleteBtn);
+            card.appendChild(cardInner);
+            
+            // 点击翻转交互
+            card.addEventListener('click', function() {
+                this.classList.toggle('is-flipped');
+            });
+            
+            // 将新生成的卡片插入到网格最前面
+            grid.insertBefore(card, grid.firstChild);
+        }
+    </script>
+</body>
+</html>
